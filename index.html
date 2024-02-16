@@ -1,0 +1,87 @@
+<html>
+<head>
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+</head>
+<body>
+  <h1>Website mit Bluetooth-Verbindung und Bildschirmübertragung</h1>
+  <p>Drücke den Button, um dich mit einem anderen Handy per Bluetooth zu verbinden und dessen Bildschirm auf die Seite zu übertragen.</p>
+  <video id="remoteVideo" autoplay></video>
+  <button id="connectButton">Verbinden</button>
+  <script>
+    // Variablen für die HTML-Elemente
+    const remoteVideo = document.getElementById("remoteVideo");
+    const connectButton = document.getElementById("connectButton");
+
+    // Variable für die Bluetooth-Verbindung
+    let bluetoothDevice;
+
+    // Variable für die WebRTC-Verbindung
+    let peerConnection;
+
+    // Funktion, die aufgerufen wird, wenn der Button gedrückt wird
+    async function connect() {
+      try {
+        // Bluetooth-Gerät anfragen und verbinden
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ["battery_service"] }], // Hier kannst du die gewünschten Services filtern
+        });
+        console.log("Bluetooth-Gerät verbunden:", bluetoothDevice);
+
+        // WebRTC-Verbindung erstellen und konfigurieren
+        peerConnection = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }], // Hier kannst du die gewünschten ICE-Server angeben
+        });
+        console.log("WebRTC-Verbindung erstellt:", peerConnection);
+
+        // Lokalen Bildschirm erfassen und als Stream hinzufügen
+        const localStream = await navigator.mediaDevices.getDisplayMedia();
+        localStream.getTracks().forEach((track) => {
+          peerConnection.addTrack(track, localStream);
+        });
+        console.log("Lokaler Bildschirm erfasst und hinzugefügt:", localStream);
+
+        // Remote-Stream empfangen und anzeigen
+        peerConnection.ontrack = (event) => {
+          remoteVideo.srcObject = event.streams[0];
+          console.log("Remote-Stream empfangen und angezeigt:", event.streams[0]);
+        };
+
+        // Angebot erstellen und senden
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        console.log("Angebot erstellt und gesendet:", offer);
+
+        // Antwort empfangen und akzeptieren
+        // Hier musst du eine Methode implementieren, um die Antwort vom anderen Gerät zu erhalten, zum Beispiel über Bluetooth oder einen Signaling-Server
+        const answer = await receiveAnswer();
+        await peerConnection.setRemoteDescription(answer);
+        console.log("Antwort empfangen und akzeptiert:", answer);
+      } catch (error) {
+        // Fehler behandeln
+        console.error(error);
+      }
+    }
+
+    // Funktion, die aufgerufen wird, wenn das Bluetooth-Gerät getrennt wird
+    function disconnect() {
+      // Bluetooth-Verbindung schließen
+      if (bluetoothDevice) {
+        bluetoothDevice.gatt.disconnect();
+        console.log("Bluetooth-Gerät getrennt:", bluetoothDevice);
+      }
+
+      // WebRTC-Verbindung schließen
+      if (peerConnection) {
+        peerConnection.close();
+        console.log("WebRTC-Verbindung geschlossen:", peerConnection);
+      }
+    }
+
+    // Event-Listener für den Button hinzufügen
+    connectButton.addEventListener("click", connect);
+
+    // Event-Listener für das Bluetooth-Gerät hinzufügen
+    bluetoothDevice.addEventListener("gattserverdisconnected", disconnect);
+  </script>
+</body>
+</html>
